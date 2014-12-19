@@ -15,18 +15,6 @@ namespace DPass
         public string password;
     }
 
-    [XmlRoot("server")]
-    public class Server
-    {
-        public string address;
-    }
-
-    [XmlRoot("route")]
-    public class Route
-    {
-        public string name;
-        public string address;
-    }
     [XmlRoot("configurations")]
     public class Configurations
     {

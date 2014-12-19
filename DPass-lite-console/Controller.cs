@@ -8,7 +8,6 @@ using System.Xml.Serialization;
 using System.Collections;
 using DPass;
 using RestSharp;
-using System.Threading;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json; // Load Reference hinted by http://stackoverflow.com/questions/2682147/where-is-the-system-runtime-serialization-json-namespace?lq=1
 
@@ -29,7 +28,6 @@ namespace AttLogs
         private RestRequest restClientRequest;
 
         private DPass.Host host;
-        private DPass.Server server;
         private DPass.Configurations configurations;
         private List<AttLogs.AttendanceRecord> attendanceRecordList;
         private List<AttLogs.AttendanceRecord> newAttendanceRecordList;
@@ -37,11 +35,15 @@ namespace AttLogs
 
         
         /**
+         * Controller.cs
+         * All data preparations and upload procedures are deployed here.
          * 
-         * All initial data preparations to be deployed here.
-         * 
-         * 
-         * 
+         * The process follows the order.
+         * - Obtain all Configurations
+         * - Limit Operation Time
+         * - Connect to Attendance Device
+         * - Upload to Remote Server
+         * - Update local respository
          * 
          * 
          */
@@ -67,20 +69,6 @@ namespace AttLogs
             // prepare storage name
             string databaseAttendanceXmlFileName = OutputTextController.getTimeSet() + ".xml";
             databaseAttendanceXmlFile = new FileStream(databaseAttendanceXmlFileName, FileMode.Create);
-
-
-            try
-            {
-                // configurate destination file
-                xmlConfigurationSettings = new XmlSerializer(typeof(DPass.Server));
-                server = (DPass.Server)xmlConfigurationSettings.Deserialize(new FileStream(@"server.xml", FileMode.Open));
-            }
-            catch (Exception e)
-            {
-                OutputTextController.write("Server Setting File Error");
-                OutputTextController.write(e.Message);
-                return;
-            }
             try
             {
                 // read source host setting xml
@@ -182,6 +170,7 @@ namespace AttLogs
                 if (Convert.ToBoolean(databaseAttendanceRecordList.Count) || configurations.alwaysUpload) 
                 {
                     OutputTextController.write("Uploading to server:" + configurations.serverAddress);
+                    //http://stackoverflow.com/questions/78181/how-do-you-get-a-string-from-a-memorystream
                     MemoryStream jsonStream = new MemoryStream();
                     jsonSerializer.WriteObject(jsonStream, databaseAttendanceRecordList); // TODO change gack to databaseAttendanceRecordList
                     jsonStream.Position = 0;
