@@ -26,6 +26,7 @@ namespace DPass
         public bool alwaysUpload;
         public string hostFile;
         public string recordFile;
+        public string logFile;
         public int maximumTime;
     }
 }
