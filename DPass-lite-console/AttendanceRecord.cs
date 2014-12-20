@@ -5,7 +5,7 @@ using System.Runtime.Serialization;
 using System.Xml.Serialization;
 
 namespace AttLogs
-{
+{ //http://stackoverflow.com/questions/14298968/is-there-a-way-to-alias-response-model-properties-in-asp-net-web-api
     [DataContract]
     [XmlRoot("AttendanceRecord")]
     public class AttendanceRecord
@@ -112,5 +112,12 @@ namespace AttLogs
         {
             this.dateTime = this.idwYear + "-" + this.idwMonth + "-" + this.idwDay + " " + this.idwHour + ":" + this.idwMinute;
         }
+    }
+
+    [DataContract]
+    public class AttendanceResult
+    {
+        [DataMember(Name = "transactionId")]
+        public int transactionId { get; set; }
     }
 }
