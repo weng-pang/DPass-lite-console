@@ -16,8 +16,7 @@ namespace DPass
         {
             Console.WriteLine("Attendance Data Middleware Launched");
             Controller control = new Controller();
-            Console.WriteLine("Press Enter to Leave...");
-            Console.ReadKey();
+            
             
             
             

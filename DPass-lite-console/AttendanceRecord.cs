@@ -10,6 +10,10 @@ namespace AttLogs
     [XmlRoot("AttendanceRecord")]
     public class AttendanceRecord
     {
+        [DataMember(Name = "transactionId")]
+        [XmlElement(ElementName = "transactionId")]
+        public int transactionId { get; set; }
+
         [DataMember(Name = "id")]
         [XmlElement(ElementName = "id")]
         public int sdwEnrollNumber {get; set;}
