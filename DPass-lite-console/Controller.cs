@@ -146,6 +146,8 @@ namespace AttLogs
             // disregard current records
                 databaseAttendanceRecordList = new List<AttendanceRecord>();
                 OutputTextController.write("Downloaded Record Count:" + newAttendanceRecordList.Count + ",Current Record Count:" + attendanceRecordList.Count);
+            // gauge for new attendance set
+                bool newRecordSet = false;
                 if (attendanceRecordList.Count == newAttendanceRecordList.Count)
                 {// Possibly No New Records
                     OutputTextController.write("No New Records Found");
@@ -156,6 +158,7 @@ namespace AttLogs
                     //attendanceRecordList.AddRange(newAttendanceRecordList);
                     // database upload
                     databaseAttendanceRecordList = newAttendanceRecordList;
+                    newRecordSet = true;
                 }
                 else if (attendanceRecordList.Count < newAttendanceRecordList.Count)
                 {// New Records to replace current list
@@ -229,8 +232,19 @@ namespace AttLogs
                                 i++;
                             }
                             OutputTextController.write("Transaction Ids:" + transactionList);
-                            // apply the attendance list into final storage list
-                            attendanceRecordList.AddRange(databaseAttendanceRecordList);
+                            if (newRecordSet) // check for handling new set of records
+                            {
+                                // transfer old record database to a new one
+                                string oldDatabaseAttendanceXmlFileName = "archive/" + OutputTextController.getTimeSet() + "archive.xml";
+                                FileStream oldDatabaseAttendanceXmlFile = new FileStream(oldDatabaseAttendanceXmlFileName, FileMode.Create);
+                                xmlAttendanceRecordSet.Serialize(oldDatabaseAttendanceXmlFile, attendanceRecordList);
+                                attendanceRecordList = databaseAttendanceRecordList;
+                            } else
+                            {
+                                // apply the attendance list into final storage list
+                                attendanceRecordList.AddRange(databaseAttendanceRecordList);
+                            }
+                            
                             // update local record repository - only if update to remote database possible
                             // https://www.udemy.com/blog/csharp-serialize-to-xml/
                             attendanceXmlFile.SetLength(0); // Clear the original record repository
