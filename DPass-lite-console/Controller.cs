@@ -8,6 +8,7 @@ using System.Xml.Serialization;
 using System.Collections;
 using DPass;
 using RestSharp;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json; // Load Reference hinted by http://stackoverflow.com/questions/2682147/where-is-the-system-runtime-serialization-json-namespace?lq=1
 
@@ -17,8 +18,9 @@ namespace AttLogs
     {
         private XmlSerializer xmlConfigurationSettings;
         private XmlSerializer xmlAttendanceRecordSet;
-        DataContractJsonSerializer jsonSerializer =
+        private DataContractJsonSerializer jsonAttendanceSerializer =
     new DataContractJsonSerializer(typeof(List<AttLogs.AttendanceRecord>));
+        private DataContractJsonSerializer jsonTransactionSerializer = new DataContractJsonSerializer(typeof(List<AttLogs.AttendanceResult>));
 
         private FileStream attendanceXmlFile;
         private FileStream databaseAttendanceXmlFile;
@@ -33,7 +35,7 @@ namespace AttLogs
         private List<AttLogs.AttendanceRecord> newAttendanceRecordList;
         private List<AttLogs.AttendanceRecord> databaseAttendanceRecordList;
 
-        
+        private static bool workCompleted = true;
         /**
          * Controller.cs
          * All data preparations and upload procedures are deployed here.
@@ -55,6 +57,7 @@ namespace AttLogs
             { 
                 xmlConfigurationSettings = new XmlSerializer(typeof(DPass.Configurations));
                 configurations = (DPass.Configurations)xmlConfigurationSettings.Deserialize(new FileStream(@"configurations.xml", FileMode.Open));
+                 new OutputTextController(configurations);
             }
             catch (Exception e)
             {
@@ -67,7 +70,7 @@ namespace AttLogs
             Thread timeLimit = new Thread(() => executionCounter(configurations.maximumTime));
             timeLimit.Start();
             // prepare storage name
-            string databaseAttendanceXmlFileName = OutputTextController.getTimeSet() + ".xml";
+            string databaseAttendanceXmlFileName = "archive/"+OutputTextController.getTimeSet() + ".xml";
             databaseAttendanceXmlFile = new FileStream(databaseAttendanceXmlFileName, FileMode.Create);
             try
             {
@@ -96,7 +99,7 @@ namespace AttLogs
             }
             catch (InvalidOperationException e)
             {
-                OutputTextController.write("Record Repository is fault or not presented. A new one is to be created");
+                OutputTextController.write("Record Repository is faulty or not presented. A new one is to be created");
                 //OutputTextController.write(e.Message);
                 //OutputTextController.write("ERROR IN" + e.StackTrace);
                 attendanceRecordList = new List<AttendanceRecord>();
@@ -150,19 +153,29 @@ namespace AttLogs
                 else if (attendanceRecordList.Count > newAttendanceRecordList.Count)
                 {// Possibly Attendance Machine Updates
                     OutputTextController.write("Possible New Attendance Record Set Found");
-                    attendanceRecordList.AddRange(newAttendanceRecordList);
+                    //attendanceRecordList.AddRange(newAttendanceRecordList);
                     // database upload
                     databaseAttendanceRecordList = newAttendanceRecordList;
                 }
                 else if (attendanceRecordList.Count < newAttendanceRecordList.Count)
                 {// New Records to replace current list
                     OutputTextController.write("New Records Found");
-                    attendanceRecordList = newAttendanceRecordList;
-                    // database upload
-                    for (int i = attendanceRecordList.Count - 1; i < newAttendanceRecordList.Count;i++ )
-                    {// new record cursor shifts back by 1
-                        databaseAttendanceRecordList.Add(newAttendanceRecordList[i]);
+                    
+                    // for new completely new database
+                    if (attendanceRecordList.Count == 0)
+                    {
+                        databaseAttendanceRecordList = newAttendanceRecordList;
                     }
+                    else
+                    {
+                        // database upload
+                        for (int i = attendanceRecordList.Count - 1; i < newAttendanceRecordList.Count; i++)
+                        {// new record cursor shifts back by 1
+                            databaseAttendanceRecordList.Add(newAttendanceRecordList[i]);
+                        }
+                    }
+                    // apply the attendance list into final storage list
+                    //attendanceRecordList = newAttendanceRecordList;
                 }
                 OutputTextController.write("Number of Records to be Uploaded:" + databaseAttendanceRecordList.Count);
             // upload new records to database
@@ -172,7 +185,7 @@ namespace AttLogs
                     OutputTextController.write("Uploading to server:" + configurations.serverAddress);
                     //http://stackoverflow.com/questions/78181/how-do-you-get-a-string-from-a-memorystream
                     MemoryStream jsonStream = new MemoryStream();
-                    jsonSerializer.WriteObject(jsonStream, databaseAttendanceRecordList); // TODO change gack to databaseAttendanceRecordList
+                    jsonAttendanceSerializer.WriteObject(jsonStream, databaseAttendanceRecordList); // TODO change gack to databaseAttendanceRecordList
                     jsonStream.Position = 0;
                     StreamReader jsonReader = new StreamReader(jsonStream);
                     string jsonOutput = jsonReader.ReadToEnd();
@@ -197,27 +210,67 @@ namespace AttLogs
                     else
                     {
                         var content = response.Content; // raw content as string
-                        OutputTextController.write(content);
-                        // update local record repository - only if update to remote database possible
-                        // https://www.udemy.com/blog/csharp-serialize-to-xml/
-                        attendanceXmlFile.SetLength(0); // Clear the original record repository
-                        xmlAttendanceRecordSet.Serialize(attendanceXmlFile, attendanceRecordList);
-                        xmlAttendanceRecordSet.Serialize(databaseAttendanceXmlFile, databaseAttendanceRecordList);
                         
+                        try
+                        { // The memory stream is fed directly by the result set
+                            // http://philcurnow.wordpress.com/2013/12/29/serializing-and-deserializing-json-in-c/
+                            // if there is anything not conform with attendance result, an exception will be thrown.
+                            jsonStream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+                            jsonStream.Position = 0;                            
+                            List<AttLogs.AttendanceResult> transactionResults =(List<AttLogs.AttendanceResult>)jsonTransactionSerializer.ReadObject(jsonStream);
+                            OutputTextController.write("Uploaded Record Count:" + transactionResults.Count);
+                            string transactionList = "";
+                            int i = 0;
+                            foreach (var item in transactionResults)
+                            {
+                                transactionList += Convert.ToString(item.transactionId) +";";
+                                // apply the transaction id to record
+                                databaseAttendanceRecordList[i].transactionId = item.transactionId;
+                                i++;
+                            }
+                            OutputTextController.write("Transaction Ids:" + transactionList);
+                            // apply the attendance list into final storage list
+                            attendanceRecordList.AddRange(databaseAttendanceRecordList);
+                            // update local record repository - only if update to remote database possible
+                            // https://www.udemy.com/blog/csharp-serialize-to-xml/
+                            attendanceXmlFile.SetLength(0); // Clear the original record repository
+                            xmlAttendanceRecordSet.Serialize(attendanceXmlFile, attendanceRecordList);
+                            xmlAttendanceRecordSet.Serialize(databaseAttendanceXmlFile, databaseAttendanceRecordList);
+                            workCompleted = true; // only when a full completed operation can mark work completed
+                        }
+                        catch (Exception e)
+                        {
+                            OutputTextController.write("Upload is not done. It may be caused by failure from the server");
+                            //OutputTextController.write(e.Message);
+                            OutputTextController.write("Response From the server");
+                            OutputTextController.write(content);
+                        }
                     }
                 } // Do not initialise rest client if no records to be added
                 attendanceXmlFile.Close();
                 databaseAttendanceXmlFile.Close();
+            // Prompt for application exit
+                Console.WriteLine("Press Enter to Leave...");
+                OutputTextController.write(Console.ReadLine());
+                applicationExit(); 
         }
 
         public static void executionCounter(int time)
         {
             Thread.Sleep(time);
-            OutputTextController.write("Operation Time Exceeded. Application Exit. Maximum Time: "+ time +"ms");
+            OutputTextController.write("Operation Time Exceeded. Application Force Exit. Maximum Time: "+ time +"ms");
             //http://stackoverflow.com/questions/12977924/how-to-properly-exit-a-c-sharp-application
-            Environment.Exit(0); // Just taking a normal exit
+            applicationExit(); // Just taking a normal exit
         }
 
+        public static void applicationExit()
+        {
+            if (workCompleted)
+            {
+                Environment.Exit(0); // Just taking a normal exit
+            }
+            Environment.Exit(1);
+        }
 
     }
 
