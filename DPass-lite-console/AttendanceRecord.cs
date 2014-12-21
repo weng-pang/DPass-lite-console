@@ -10,7 +10,7 @@ namespace AttLogs
     [XmlRoot("AttendanceRecord")]
     public class AttendanceRecord
     {
-        [DataMember(Name = "transactionId")]
+        [IgnoreDataMember]
         [XmlElement(ElementName = "transactionId")]
         public int transactionId { get; set; }
 

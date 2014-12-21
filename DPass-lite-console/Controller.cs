@@ -169,8 +169,8 @@ namespace AttLogs
                     else
                     {
                         // database upload
-                        for (int i = attendanceRecordList.Count - 1; i < newAttendanceRecordList.Count; i++)
-                        {// new record cursor shifts back by 1
+                        for (int i = attendanceRecordList.Count; i < newAttendanceRecordList.Count; i++)
+                        {// new record cursor shifts back by 1 // This part is deleted, previously attendanceRecordList.Count -1
                             databaseAttendanceRecordList.Add(newAttendanceRecordList[i]);
                         }
                     }
@@ -197,7 +197,7 @@ namespace AttLogs
                     {// This part reserves for future implmentation of single or batch uploads
                         // TODO leave this part empty
                     }
-                    OutputTextController.write(jsonOutput);
+                    //OutputTextController.write(jsonOutput);
                     
                     restClientRequest.AddParameter("content", jsonOutput);
 
