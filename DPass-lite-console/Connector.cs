@@ -113,31 +113,62 @@ namespace AttLogs
             List<AttendanceRecord> attendanceRecordList = new List<AttendanceRecord>();
 
             bool successful = ATTENDANCE.ReadGeneralLogData(iMachineNumber);
-
+            int idwTMachineNumber = 0; // for legacy machine use only
+            int idwEnrollNumber = 0;
+            int idwEMachineNumber = 0;
             if (successful)
             {
                 int recordCount = 0;
-                while (ATTENDANCE.SSR_GetGeneralLogData(iMachineNumber, out sdwEnrollNumber, out idwVerifyMode,
-                                out idwInOutMode, out idwYear, out idwMonth, out idwDay, out idwHour, out idwMinute, out idwSecond, ref idwWorkcode))//get records from the memory
+                // for legacy machine use only
+                if (this.iMachineNumber < 100)
                 {
-                    AttendanceRecord aLogEntry = new AttendanceRecord();
-                    recordCount++;
-                    aLogEntry.IdwDay = idwDay;
-                    aLogEntry.IdwHour = idwHour;
-                    aLogEntry.idwInOutMode = idwInOutMode;
-                    aLogEntry.IdwMinute = idwMinute;
-                    aLogEntry.IdwMonth = idwMonth;
-                    aLogEntry.IdwSecond = idwSecond;
-                    aLogEntry.IdwVerifyMode = idwVerifyMode;
-                    aLogEntry.IdwWorkcode = idwWorkcode;
-                    aLogEntry.IdwYear = idwYear;
-                    aLogEntry.sdwEnrollNumber = Convert.ToInt16(sdwEnrollNumber);
-                    aLogEntry.assembleDate(); // Transform the date into proper format
-                    aLogEntry.ipAddress = this.ipAddress;
-                    aLogEntry.portNumber = this.port;
-                    aLogEntry.machineId = this.iMachineNumber;
-                    attendanceRecordList.Add(aLogEntry);
-                    Console.WriteLine("Console:Processing Record: " + recordCount);
+                    while (ATTENDANCE.GetGeneralLogData(iMachineNumber, ref idwTMachineNumber, ref idwEnrollNumber,
+                           ref idwEMachineNumber, ref idwVerifyMode, ref idwInOutMode, ref idwYear, ref idwMonth, ref idwDay, ref idwHour, ref idwMinute))//get records from the memory
+                    {
+                        AttendanceRecord aLogEntry = new AttendanceRecord();
+                        recordCount++;
+                        aLogEntry.IdwDay = idwDay;
+                        aLogEntry.IdwHour = idwHour;
+                        aLogEntry.idwInOutMode = idwInOutMode;
+                        aLogEntry.IdwMinute = idwMinute;
+                        aLogEntry.IdwMonth = idwMonth;
+                        aLogEntry.IdwSecond = idwSecond;
+                        aLogEntry.IdwVerifyMode = idwVerifyMode;
+                        aLogEntry.IdwWorkcode = idwWorkcode;
+                        aLogEntry.IdwYear = idwYear;
+                        aLogEntry.sdwEnrollNumber = Convert.ToInt16(idwEnrollNumber);
+                        aLogEntry.assembleDate(); // Transform the date into proper format
+                        aLogEntry.ipAddress = this.ipAddress;
+                        aLogEntry.portNumber = this.port;
+                        aLogEntry.machineId = this.iMachineNumber;
+                        attendanceRecordList.Add(aLogEntry);
+                        Console.WriteLine(this.iMachineNumber + "L:Processing Record: " + recordCount);
+                    }
+                }
+                else
+                {
+                    while (ATTENDANCE.SSR_GetGeneralLogData(iMachineNumber, out sdwEnrollNumber, out idwVerifyMode,
+                                    out idwInOutMode, out idwYear, out idwMonth, out idwDay, out idwHour, out idwMinute, out idwSecond, ref idwWorkcode))//get records from the memory
+                    {
+                        AttendanceRecord aLogEntry = new AttendanceRecord();
+                        recordCount++;
+                        aLogEntry.IdwDay = idwDay;
+                        aLogEntry.IdwHour = idwHour;
+                        aLogEntry.idwInOutMode = idwInOutMode;
+                        aLogEntry.IdwMinute = idwMinute;
+                        aLogEntry.IdwMonth = idwMonth;
+                        aLogEntry.IdwSecond = idwSecond;
+                        aLogEntry.IdwVerifyMode = idwVerifyMode;
+                        aLogEntry.IdwWorkcode = idwWorkcode;
+                        aLogEntry.IdwYear = idwYear;
+                        aLogEntry.sdwEnrollNumber = Convert.ToInt16(sdwEnrollNumber);
+                        aLogEntry.assembleDate(); // Transform the date into proper format
+                        aLogEntry.ipAddress = this.ipAddress;
+                        aLogEntry.portNumber = this.port;
+                        aLogEntry.machineId = this.iMachineNumber;
+                        attendanceRecordList.Add(aLogEntry);
+                        Console.WriteLine(this.iMachineNumber + ":Processing Record: " + recordCount);
+                    }
                 }
             }
             else

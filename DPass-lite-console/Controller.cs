@@ -136,6 +136,7 @@ namespace AttLogs
                     if (idwErrorCode != 0)
                     {
                         OutputTextController.write("ERROR: Reading data from terminal failed,ErrorCode: " + idwErrorCode.ToString());
+                        OutputTextController.write(f.Message);
                     }
                     else
                     {
