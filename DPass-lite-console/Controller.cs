@@ -21,6 +21,7 @@ namespace AttLogs
         private DataContractJsonSerializer jsonAttendanceSerializer =
     new DataContractJsonSerializer(typeof(List<AttLogs.AttendanceRecord>));
         private DataContractJsonSerializer jsonTransactionSerializer = new DataContractJsonSerializer(typeof(List<AttLogs.AttendanceResult>));
+        private DataContractJsonSerializer jsonErrorSerializer = new DataContractJsonSerializer(typeof(AttLogs.ErrorResult));
 
         private FileStream attendanceXmlFile;
         private FileStream databaseAttendanceXmlFile;
@@ -219,8 +220,15 @@ namespace AttLogs
                             // http://philcurnow.wordpress.com/2013/12/29/serializing-and-deserializing-json-in-c/
                             // if there is anything not conform with attendance result, an exception will be thrown.
                             jsonStream = new MemoryStream(Encoding.UTF8.GetBytes(content));
-                            jsonStream.Position = 0;                            
+                            jsonStream.Position = 0;  
                             List<AttLogs.AttendanceResult> transactionResults =(List<AttLogs.AttendanceResult>)jsonTransactionSerializer.ReadObject(jsonStream);
+                            if (transactionResults.Count == 0)
+                            {// additional check to ensure zero upload count is not caused by an error
+                                if (content != "[]") // this is a lazy way
+                                {
+                                    throw new ExecutionEngineException(content);
+                                }
+                            }
                             OutputTextController.write("Uploaded Record Count:" + transactionResults.Count);
                             string transactionList = "";
                             int i = 0;

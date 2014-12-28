@@ -124,4 +124,13 @@ namespace AttLogs
         [DataMember(Name = "transactionId")]
         public int transactionId { get; set; }
     }
+
+    [DataContract]
+    public class ErrorResult
+    {
+        [DataMember (Name = "procedure")]
+        public string procedure { get; set; }
+        [DataMember (Name = "text")]
+        public string text { get; set; }
+    }
 }
