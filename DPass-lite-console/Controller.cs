@@ -64,7 +64,7 @@ namespace AttLogs
             {
                 OutputTextController.write("Configuration File Error");
                 OutputTextController.write(e.Message);
-                return;
+                applicationEnd();
             }
             // Arrange a thread for maximum operation time limit
             //http://stackoverflow.com/questions/3360555/how-to-pass-parameters-to-threadstart-method-in-thread
@@ -82,14 +82,14 @@ namespace AttLogs
                 if (!Validator.checkIpAddress(host.ipAddress) || !Validator.checkPort(Convert.ToString(host.port)))
                 {
                     OutputTextController.write("ERROR: IP and Port cannot be null or incorrect");
-                    return;
+                    applicationEnd();
                 }
             }
             catch (Exception e)
             {
                 OutputTextController.write("HOST Setting File Error");
                 //OutputTextController.write(e.Message);
-                return;
+                applicationEnd();
             }
             try
             {
@@ -104,7 +104,7 @@ namespace AttLogs
                 //OutputTextController.write(e.Message);
                 //OutputTextController.write("ERROR IN" + e.StackTrace);
                 attendanceRecordList = new List<AttendanceRecord>();
-                //return;
+                //applicationEnd();
             }
             int idwErrorCode = 0;
             
@@ -142,7 +142,7 @@ namespace AttLogs
                     {
                         OutputTextController.write("ERROR: No data from terminal returns!");
                     }
-                    return;
+                    applicationEnd();
                 }
                 attendanceConnection.enableDevice(true);//re-enable the device
             // disregard current records
@@ -187,95 +187,112 @@ namespace AttLogs
                 //http://msdn.microsoft.com/en-us/library/system.convert.toboolean%28v=vs.110%29.aspx
                 if (Convert.ToBoolean(databaseAttendanceRecordList.Count) || configurations.alwaysUpload) 
                 {
-                    OutputTextController.write("Uploading to server:" + configurations.serverAddress);
-                    //http://stackoverflow.com/questions/78181/how-do-you-get-a-string-from-a-memorystream
-                    MemoryStream jsonStream = new MemoryStream();
-                    jsonAttendanceSerializer.WriteObject(jsonStream, databaseAttendanceRecordList); // TODO change gack to databaseAttendanceRecordList
-                    jsonStream.Position = 0;
-                    StreamReader jsonReader = new StreamReader(jsonStream);
-                    string jsonOutput = jsonReader.ReadToEnd();
-                    restClient = new RestClient(configurations.serverAddress);
-                    restClientRequest = new RestRequest(configurations.normalRoute, Method.POST);
-                    restClientRequest.AddParameter("key", configurations.accessKey);
-                    // check for upload size
-                    if (databaseAttendanceRecordList.Count > configurations.batchCount)
-                    {// This part reserves for future implmentation of single or batch uploads
-                        // TODO leave this part empty
-                    }
-                    //OutputTextController.write(jsonOutput);
                     
-                    restClientRequest.AddParameter("content", jsonOutput);
+                    //http://stackoverflow.com/questions/78181/how-do-you-get-a-string-from-a-memorystream
+                    MemoryStream jsonStream;
+                    // perform batch fragmentation procedures here
+                    List<AttendanceRecord> currentUploadSet = new List<AttendanceRecord>();
+                    StreamReader jsonReader;
+                    int uploadCount = 0;
+                    string jsonOutput;
+                    // reference for last item
+                    // http://stackoverflow.com/questions/1068110/identifying-last-loop-when-using-for-each
+                    AttendanceRecord lastRecord = databaseAttendanceRecordList[databaseAttendanceRecordList.Count - 1];
+                    foreach (AttendanceRecord currentRecord in databaseAttendanceRecordList)
+                    {
+                        currentUploadSet.Add(currentRecord);
+                        // upload the record when reaching the end or batch limitation
+                        if (currentUploadSet.Count == configurations.batchCount || currentRecord == lastRecord)
+                        {
+                            jsonStream = new MemoryStream();
+                            jsonAttendanceSerializer.WriteObject(jsonStream, currentUploadSet);
+                            jsonStream.Position = 0;
+                            jsonReader = new StreamReader(jsonStream);
+                            jsonOutput = jsonReader.ReadToEnd();
+                            restClient = new RestClient(configurations.serverAddress);
+                            restClientRequest = new RestRequest(configurations.normalRoute, Method.POST);
+                            restClientRequest.AddParameter("key", configurations.accessKey);
+                            restClientRequest.AddParameter("content", jsonOutput);
+                            // execute the request
+                            OutputTextController.write("Uploading to server:" + configurations.serverAddress +"TIME(S):" + ++uploadCount);
+                            IRestResponse response = restClient.Execute(restClientRequest);
 
-                    // execute the request
-                    IRestResponse response = restClient.Execute(restClientRequest);
-                    if (response.ErrorException != null)
-                    {
-                        OutputTextController.write(response.ErrorMessage);
-                    }
-                    else
-                    {
-                        var content = response.Content; // raw content as string
-                        
-                        try
-                        { // The memory stream is fed directly by the result set
-                            // http://philcurnow.wordpress.com/2013/12/29/serializing-and-deserializing-json-in-c/
-                            // if there is anything not conform with attendance result, an exception will be thrown.
-                            jsonStream = new MemoryStream(Encoding.UTF8.GetBytes(content));
-                            jsonStream.Position = 0;  
-                            List<AttLogs.AttendanceResult> transactionResults =(List<AttLogs.AttendanceResult>)jsonTransactionSerializer.ReadObject(jsonStream);
-                            if (transactionResults.Count == 0)
-                            {// additional check to ensure zero upload count is not caused by an error
-                                if (content != "[]") // this is a lazy way
+                            if (response.ErrorException != null)
+                            {
+                                OutputTextController.write(response.ErrorMessage);
+                            }
+                            else
+                            {
+                                var content = response.Content; // raw content as string
+
+                                try
+                                { // The memory stream is fed directly by the result set
+                                    // http://philcurnow.wordpress.com/2013/12/29/serializing-and-deserializing-json-in-c/
+                                    // if there is anything not conform with attendance result, an exception will be thrown.
+                                    jsonStream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+                                    jsonStream.Position = 0;
+                                    List<AttLogs.AttendanceResult> transactionResults = (List<AttLogs.AttendanceResult>)jsonTransactionSerializer.ReadObject(jsonStream);
+                                    if (transactionResults.Count == 0)
+                                    {// additional check to ensure zero upload count is not caused by an error
+                                        if (content != "[]") // this is a lazy way
+                                        {
+                                            throw new ExecutionEngineException(content);
+                                        }
+                                    }
+                                    OutputTextController.write("Uploaded Record Count:" + transactionResults.Count + "TIME(S):" + uploadCount);
+                                    string transactionList = "";
+                                    int i = 0;
+                                    foreach (var item in transactionResults)
+                                    {
+                                        transactionList += Convert.ToString(item.transactionId) + ";";
+                                        // apply the transaction id to record
+                                        databaseAttendanceRecordList[i].transactionId = item.transactionId;
+                                        i++;
+                                    }
+                                    OutputTextController.write("Transaction Ids:" + transactionList);
+                                    // apply the attendance list into final storage list
+                                    attendanceRecordList.AddRange(currentUploadSet);
+                                    // clear current upload set for next batch
+                                    currentUploadSet.Clear();
+                                }
+                                catch (Exception e)
                                 {
-                                    throw new ExecutionEngineException(content);
+                                    OutputTextController.write("Upload is not done. It may be caused by failure from the server");
+                                    //OutputTextController.write(e.Message);
+                                    OutputTextController.write("Response From the server");
+                                    OutputTextController.write(content);
+                                    applicationEnd(); // place the rest of operation into halt
                                 }
                             }
-                            OutputTextController.write("Uploaded Record Count:" + transactionResults.Count);
-                            string transactionList = "";
-                            int i = 0;
-                            foreach (var item in transactionResults)
-                            {
-                                transactionList += Convert.ToString(item.transactionId) +";";
-                                // apply the transaction id to record
-                                databaseAttendanceRecordList[i].transactionId = item.transactionId;
-                                i++;
-                            }
-                            OutputTextController.write("Transaction Ids:" + transactionList);
-                            if (newRecordSet) // check for handling new set of records
-                            {
-                                // transfer old record database to a new one
-                                string oldDatabaseAttendanceXmlFileName = "archive/" + OutputTextController.getTimeSet() + "archive.xml";
-                                FileStream oldDatabaseAttendanceXmlFile = new FileStream(oldDatabaseAttendanceXmlFileName, FileMode.Create);
-                                xmlAttendanceRecordSet.Serialize(oldDatabaseAttendanceXmlFile, attendanceRecordList);
-                                attendanceRecordList = databaseAttendanceRecordList;
-                            } else
-                            {
-                                // apply the attendance list into final storage list
-                                attendanceRecordList.AddRange(databaseAttendanceRecordList);
-                            }
-                            
-                            // update local record repository - only if update to remote database possible
-                            // https://www.udemy.com/blog/csharp-serialize-to-xml/
-                            attendanceXmlFile.SetLength(0); // Clear the original record repository
-                            xmlAttendanceRecordSet.Serialize(attendanceXmlFile, attendanceRecordList);
-                            xmlAttendanceRecordSet.Serialize(databaseAttendanceXmlFile, databaseAttendanceRecordList);
-                            workCompleted = true; // only when a full completed operation can mark work completed
-                        }
-                        catch (Exception e)
-                        {
-                            OutputTextController.write("Upload is not done. It may be caused by failure from the server");
-                            //OutputTextController.write(e.Message);
-                            OutputTextController.write("Response From the server");
-                            OutputTextController.write(content);
                         }
                     }
-                } // Do not initialise rest client if no records to be added
+                 
+                    
+
+                }
+                if (newRecordSet) // check for handling new set of records
+                {
+                    // transfer old record database to a new one
+                    string oldDatabaseAttendanceXmlFileName = "archive/" + OutputTextController.getTimeSet() + "archive.xml";
+                    FileStream oldDatabaseAttendanceXmlFile = new FileStream(oldDatabaseAttendanceXmlFileName, FileMode.Create);
+                    xmlAttendanceRecordSet.Serialize(oldDatabaseAttendanceXmlFile, attendanceRecordList);
+                    attendanceRecordList = databaseAttendanceRecordList; // this will completely replace the record
+                }
+                else
+                {
+                    // apply the attendance list into final storage list
+                    //attendanceRecordList.AddRange(databaseAttendanceRecordList);
+                }
+                // update local record repository - only if update to remote database possible
+                // https://www.udemy.com/blog/csharp-serialize-to-xml/
+                attendanceXmlFile.SetLength(0); // Clear the original record repository
+                xmlAttendanceRecordSet.Serialize(attendanceXmlFile, attendanceRecordList);
+                xmlAttendanceRecordSet.Serialize(databaseAttendanceXmlFile, databaseAttendanceRecordList);
+                workCompleted = true; // only when a full completed operation can mark work completed
+            // Do not initialise rest client if no records to be added
                 attendanceXmlFile.Close();
                 databaseAttendanceXmlFile.Close();
-            // Prompt for application exit
-                Console.WriteLine("Press Enter to Leave...");
-                OutputTextController.write(Console.ReadLine());
-                applicationExit(); 
+                applicationEnd();
         }
 
         public static void executionCounter(int time)
@@ -285,7 +302,13 @@ namespace AttLogs
             //http://stackoverflow.com/questions/12977924/how-to-properly-exit-a-c-sharp-application
             applicationExit(); // Just taking a normal exit
         }
-
+        public static void applicationEnd()
+        {
+            // Prompt for application exit
+            Console.WriteLine("Press Enter to Leave...");
+            OutputTextController.write(Console.ReadLine());
+            applicationExit(); 
+        }
         public static void applicationExit()
         {
             if (workCompleted)
