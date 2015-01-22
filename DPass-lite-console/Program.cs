@@ -15,7 +15,10 @@ namespace DPass
         static void Main(string[] args)
         {
             Console.WriteLine("Attendance Data Middleware Launched");
-            Controller control = new Controller();
+            Controller control = new Controller(args[0]);
+
+            //Console.WriteLine(args[0]);
+            //Console.ReadLine();
             
             
             

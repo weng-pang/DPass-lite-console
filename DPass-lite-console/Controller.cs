@@ -50,14 +50,14 @@ namespace AttLogs
          * 
          * 
          */
-        public Controller()
+        public Controller(string configurationFileName)
         {
             
             // Read Configruation File
             try
             { 
                 xmlConfigurationSettings = new XmlSerializer(typeof(DPass.Configurations));
-                configurations = (DPass.Configurations)xmlConfigurationSettings.Deserialize(new FileStream(@"configurations.xml", FileMode.Open));
+                configurations = (DPass.Configurations)xmlConfigurationSettings.Deserialize(new FileStream(@configurationFileName + ".xml", FileMode.Open));
                  new OutputTextController(configurations);
             }
             catch (Exception e)
@@ -70,9 +70,6 @@ namespace AttLogs
             //http://stackoverflow.com/questions/3360555/how-to-pass-parameters-to-threadstart-method-in-thread
             Thread timeLimit = new Thread(() => executionCounter(configurations.maximumTime));
             timeLimit.Start();
-            // prepare storage name
-            string databaseAttendanceXmlFileName = "archive/"+OutputTextController.getTimeSet() + ".xml";
-            databaseAttendanceXmlFile = new FileStream(databaseAttendanceXmlFileName, FileMode.Create);
             try
             {
                 // read source host setting xml
@@ -84,6 +81,9 @@ namespace AttLogs
                     OutputTextController.write("ERROR: IP and Port cannot be null or incorrect");
                     applicationEnd();
                 }
+                // prepare storage name
+                string databaseAttendanceXmlFileName = "archive/" + host.machineId + "." + OutputTextController.getTimeSet() + ".xml";
+                databaseAttendanceXmlFile = new FileStream(databaseAttendanceXmlFileName, FileMode.Create);
             }
             catch (Exception e)
             {
@@ -197,7 +197,11 @@ namespace AttLogs
                     string jsonOutput;
                     // reference for last item
                     // http://stackoverflow.com/questions/1068110/identifying-last-loop-when-using-for-each
-                    AttendanceRecord lastRecord = databaseAttendanceRecordList[databaseAttendanceRecordList.Count - 1];
+                    AttendanceRecord lastRecord = null;
+                    if (Convert.ToBoolean(databaseAttendanceRecordList.Count))
+                    {
+                        lastRecord = databaseAttendanceRecordList[databaseAttendanceRecordList.Count - 1];
+                    }
                     foreach (AttendanceRecord currentRecord in databaseAttendanceRecordList)
                     {
                         currentUploadSet.Add(currentRecord);
